@@ -88,3 +88,18 @@ body {
     font-size: 18px;
     margin-left: 10px;
 }
+.restart-button {
+    background-color: #6c63ff;
+    color: white;
+    border: none;
+    padding: 10px;
+    margin-top: 10px;
+    width: 100%;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.restart-button:hover {
+    background-color: #5548d9;
+}

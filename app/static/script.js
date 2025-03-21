@@ -143,7 +143,7 @@ document.addEventListener("DOMContentLoaded", function() {
     window.sendDetailOption = function(subOption, detailName) {
         appendMessage(`Has seleccionado: ${detailName}`);
         userData.detalle = detailName;
-
+    
         fetch("/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -151,9 +151,20 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .then(response => response.json())
         .then(data => {
-            appendMessage(data.response);
-        });
+            appendMessage(data.response);  // Mostramos el mensaje con el turno asignado
+            // Agregar botón de reinicio de conversación
+            chatBody.innerHTML += `<button class="chat-option restart-button" onclick="resetChat()">🔄 Reiniciar Conversación</button>`;
+            });
     };
+
+    // Función para reiniciar el chat
+    window.resetChat = function() {
+        step = 0;
+        userData = { nombre: "", cedula: "" };
+        chatTitle.textContent = "Asistente Virtual";
+        chatBody.innerHTML = '<p id="chat-message">¡Hola! Para continuar, ingresa tu nombre:</p>';
+        micButton.disabled = true;
+    }
 
     // **Función para agregar mensajes al chat**
     function appendMessage(text, isUser = false) {

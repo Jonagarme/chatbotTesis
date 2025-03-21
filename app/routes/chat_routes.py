@@ -9,6 +9,14 @@ user_last_activity = {}
 
 SESSION_TIMEOUT = 300  # 5 minutos
 
+prioridades = {
+    "Ofertas Académicas": {"clave": "OF", "turno": "OF001"},
+    "Becas y Ayudas Económicas": {"clave": "BE", "turno": "BE001"},
+    "Requisitos de Inscripción": {"clave": "RI", "turno": "RI001"},
+    "Cambio de Carrera": {"clave": "CC", "turno": "CC001"},
+    "Atención en el Vicerrectorado": {"clave": "AV", "turno": "AV001"},
+}
+
 @chat.route('/chat', methods=['POST'])
 def chats():
     data = request.json
@@ -110,13 +118,31 @@ def chats():
             response = "Por favor, selecciona una subopción válida."
             next_step = 3
 
-    elif step == 4:
-        detail_selected = user_data.get("detalle", "")
-        user_sessions[user_id]["detalle"] = detail_selected
-        response = f"Has seleccionado la opción final: {detail_selected}. ¡Gracias por usar el asistente!"
-        next_step = 4
+    if step == 4:  # Opción final, generamos el JSON
+        opcion = user_data.get("opcion", "Desconocido")
+        subopcion = user_data.get("subopcion", "Desconocido")
+        detalle = user_data.get("detalle", "Desconocido")
+        prioridad = prioridades.get(opcion, {"clave": "XX", "turno": "XX000"})  # Default en caso de error
+
+        resultado_json = {
+            "usuario": user_data.get("nombre", "Usuario desconocido"),
+            "cedula": user_data.get("cedula", "0000000000"),
+            "opcion": opcion,
+            "subopcion": subopcion,
+            "detalle": detalle,
+            "palabra_clave": prioridad["clave"],
+            "turno": prioridad["turno"],
+            "mensaje": f"{user_data.get('nombre', 'El usuario')} quiere agendar una cita para {opcion} sobre el tema {subopcion} en {detalle}. Su turno es {prioridad['turno']}."
+        }
+
+        return jsonify({
+            "response": resultado_json["mensaje"],
+            "step": next_step,
+            "userData": resultado_json
+        })
+
     return jsonify({
         "response": response,
         "step": next_step,
-        "userData": user_sessions[user_id]  # Retorna toda la sesión del usuario
+        "userData": user_sessions[user_id]
     })
