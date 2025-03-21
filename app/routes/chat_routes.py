@@ -6,16 +6,20 @@ chat = Blueprint('chat', __name__)
 # Diccionario para almacenar datos del usuario y su última actividad
 user_sessions = {}
 user_last_activity = {}
+turnos_registrados = {}  # Para manejar turnos secuenciales
+
 
 SESSION_TIMEOUT = 300  # 5 minutos
 
+# 📌 Prioridades con claves
 prioridades = {
-    "Ofertas Académicas": {"clave": "OF", "turno": "OF001"},
-    "Becas y Ayudas Económicas": {"clave": "BE", "turno": "BE001"},
-    "Requisitos de Inscripción": {"clave": "RI", "turno": "RI001"},
-    "Cambio de Carrera": {"clave": "CC", "turno": "CC001"},
-    "Atención en el Vicerrectorado": {"clave": "AV", "turno": "AV001"},
+    "Ofertas Académicas": {"clave": "OF"},
+    "Becas y Ayudas Económicas": {"clave": "BE"},
+    "Requisitos de Inscripción": {"clave": "RI"},
+    "Cambio de Carrera": {"clave": "CC"},
+    "Atención en el Vicerrectorado": {"clave": "AV"},
 }
+
 
 @chat.route('/chat', methods=['POST'])
 def chats():
@@ -118,21 +122,29 @@ def chats():
             response = "Por favor, selecciona una subopción válida."
             next_step = 3
 
-    if step == 4:  # Opción final, generamos el JSON
-        opcion = user_data.get("opcion", "Desconocido")
-        subopcion = user_data.get("subopcion", "Desconocido")
+    elif step == 4:  # ✅ **Generamos el JSON final**
+        opcion = user_sessions[user_id].get("opcion", "Desconocido")
+        subopcion = user_sessions[user_id].get("subopcion", "Desconocido")
         detalle = user_data.get("detalle", "Desconocido")
-        prioridad = prioridades.get(opcion, {"clave": "XX", "turno": "XX000"})  # Default en caso de error
+        prioridad = prioridades.get(opcion, {"clave": "XX"})  # Default en caso de error
+
+        # 🏷️ **Generar el turno secuencial**
+        palabra_clave = prioridad["clave"]
+        if palabra_clave not in turnos_registrados:
+            turnos_registrados[palabra_clave] = 1
+        else:
+            turnos_registrados[palabra_clave] += 1
+        turno = f"{palabra_clave}{turnos_registrados[palabra_clave]:03d}"
 
         resultado_json = {
-            "usuario": user_data.get("nombre", "Usuario desconocido"),
-            "cedula": user_data.get("cedula", "0000000000"),
+            "usuario": user_sessions[user_id].get("nombre", "Usuario desconocido"),
+            "cedula": user_sessions[user_id].get("cedula", "0000000000"),
             "opcion": opcion,
             "subopcion": subopcion,
             "detalle": detalle,
-            "palabra_clave": prioridad["clave"],
-            "turno": prioridad["turno"],
-            "mensaje": f"{user_data.get('nombre', 'El usuario')} quiere agendar una cita para {opcion} sobre el tema {subopcion} en {detalle}. Su turno es {prioridad['turno']}."
+            "palabra_clave": palabra_clave,
+            "turno": turno,
+            "mensaje": f"{user_sessions[user_id].get('nombre', 'El usuario')} quiere agendar una cita para {opcion} sobre el tema {subopcion} en {detalle}. Su turno es {turno}."
         }
 
         return jsonify({

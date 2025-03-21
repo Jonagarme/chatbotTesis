@@ -9,6 +9,9 @@ document.addEventListener("DOMContentLoaded", function() {
     const chatTitle = document.getElementById("chat-title");
 
     micButton.disabled = true; 
+    let mediaRecorder;
+    let audioChunks = [];
+    let isRecording = false;
 
     function resetInactivityTimer() {
         clearTimeout(inactivityTimer);
@@ -91,6 +94,101 @@ document.addEventListener("DOMContentLoaded", function() {
             chatBody.innerHTML += `<button class="chat-option" onclick="sendOption('${key}', '${options[key]}')">${options[key]}</button>`;
         }
     };
+
+// 🎤 **Habilitar reconocimiento de voz**
+const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+const recognition = new SpeechRecognition();
+recognition.lang = "es-ES";
+recognition.continuous = false; 
+recognition.interimResults = false; 
+
+let isRecognizing = false;
+
+recognition.onstart = function() {
+    isRecognizing = true;
+    console.log("🎤 Escuchando...");
+};
+
+recognition.onend = function() {
+    isRecognizing = false;
+    console.log("🎤 Reconocimiento detenido.");
+};
+
+recognition.onresult = function(event) {
+    const transcript = event.results[0][0].transcript;
+    sendAudioToServer(transcript);  // Enviar directamente al servidor
+};
+
+// 🎤 **Capturar audio y enviarlo a Flask**
+navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+    const mediaRecorder = new MediaRecorder(stream);
+    
+    micButton.addEventListener("click", function() {
+        if (!userData.cedula) {
+            alert("⚠️ Debes ingresar tu cédula antes de usar el micrófono.");
+            return;
+        }
+
+        if (!isRecording) {
+            // 🎤 **Iniciar grabación y reconocimiento**
+            recognition.start();
+            mediaRecorder.start();
+            isRecording = true;
+            audioChunks = [];
+            micButton.textContent = "⏹️";  
+            console.log("🎤 Grabando...");
+        } else {
+            // ⏹️ **Detener grabación y reconocimiento**
+            recognition.stop();
+            mediaRecorder.stop();
+            isRecording = false;
+            micButton.textContent = "🎤";  
+            console.log("🎤 Grabación detenida.");
+        }
+    });
+
+    mediaRecorder.ondataavailable = event => {
+        audioChunks.push(event.data);
+    };
+
+    mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+        const reader = new FileReader();
+
+        reader.onloadend = function() {
+            const base64Audio = reader.result.split(",")[1]; 
+            sendAudioToServer(base64Audio, userData.cedula, userData.nombre);
+        };
+
+        reader.readAsDataURL(audioBlob);
+    };
+});
+
+    // **Enviar el audio en Base64 al servidor**
+    function sendAudioToServer(base64Audio, cedula) {
+        fetch("/process_audio", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ audio: base64Audio, cedula: cedula, nombre: userData.nombre })  // Se envía el nombre del usuario
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("🎤 Respuesta del servidor:", data);
+
+            if (data.cita) {
+                const mensajeFinal = data.cita.mensaje;  // Mensaje generado con la cita
+                appendMessage(mensajeFinal, false);  // Mostrar en el chat
+                
+                // Mostrar también el turno en un mensaje separado
+                const turnoMensaje = `🗓️ Tu turno es: ${data.cita.turno}`;
+                appendMessage(turnoMensaje, false);
+            }
+        })
+        .catch(error => console.error("Error enviando audio:", error));
+    }
+
 
     // **Enviar opción principal**
     window.sendOption = function(option, optionName) {
