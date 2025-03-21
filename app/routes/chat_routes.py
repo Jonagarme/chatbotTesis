@@ -46,11 +46,26 @@ def chats():
     }
 
     subopciones = {
-        "1": ["Pregrado", "Posgrado"],
-        "2": ["Requisitos para becas", "Renovación de becas"],
-        "3": ["Documentos requeridos", "Fechas de inscripción"],
-        "4": ["Procedimiento", "Plazos y requisitos"],
-        "5": ["Horario de atención", "Contacto del vicerrectorado"]
+        "1": {
+            "Pregrado": ["Carreras de Ingeniería", "Carreras Sociales", "Carreras de Salud"],
+            "Posgrado": ["Maestrías en Tecnología", "Maestrías en Educación", "Maestrías en Administración"]
+        },
+        "2": {
+            "Requisitos para becas": ["Becas completas", "Becas parciales", "Becas deportivas"],
+            "Renovación de becas": ["Documentos necesarios", "Plazos de renovación", "Requisitos de renovación"]
+        },
+        "3": {
+            "Documentos requeridos": ["Acta de nacimiento", "Certificado de estudios", "Comprobante de domicilio"],
+            "Fechas de inscripción": ["Fechas de preinscripción", "Fechas de examen de admisión", "Fechas de inscripción final"]
+        },
+        "4": {
+            "Procedimiento": ["Solicitud en línea", "Evaluación de requisitos", "Confirmación de cambio"],
+            "Plazos y requisitos": ["Fechas límite", "Materias convalidables", "Criterios de aceptación"]
+        },
+        "5": {
+            "Horario de atención": ["Lunes a viernes", "Sábados", "Feriados"],
+            "Contacto del vicerrectorado": ["Correo electrónico", "Teléfono", "Oficinas físicas"]
+        }
     }
 
     response = ""
@@ -85,10 +100,21 @@ def chats():
 
     elif step == 3:
         suboption_selected = user_data.get("subopcion", "")
-        user_sessions[user_id]["subopcion"] = suboption_selected
-        response = f"Has seleccionado la subopción: {suboption_selected}."
-        next_step = 3  # Se mantiene en las subopciones
+        main_option = str(list(opciones.keys())[list(opciones.values()).index(user_sessions[user_id]["opcion"])])
+        if suboption_selected in subopciones[main_option]:
+            user_sessions[user_id]["subopcion"] = suboption_selected
+            response = f"Has seleccionado la subopción: {suboption_selected}. Ahora elige un detalle:"
+            response += " | ".join(subopciones[main_option][suboption_selected])
+            next_step = 4
+        else:
+            response = "Por favor, selecciona una subopción válida."
+            next_step = 3
 
+    elif step == 4:
+        detail_selected = user_data.get("detalle", "")
+        user_sessions[user_id]["detalle"] = detail_selected
+        response = f"Has seleccionado la opción final: {detail_selected}. ¡Gracias por usar el asistente!"
+        next_step = 4
     return jsonify({
         "response": response,
         "step": next_step,
