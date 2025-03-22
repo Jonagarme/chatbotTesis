@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", function() {
     let mediaRecorder;
     let audioChunks = [];
     let isRecording = false;
+    let manuallyStopped = false;
 
     function resetInactivityTimer() {
         clearTimeout(inactivityTimer);
@@ -114,15 +115,15 @@ recognition.onend = function() {
     console.log("🎤 Reconocimiento detenido.");
 };
 
-recognition.onresult = function(event) {
-    const transcript = event.results[0][0].transcript;
-    sendAudioToServer(transcript);  // Enviar directamente al servidor
-};
+// recognition.onresult = function(event) {
+//     const transcript = event.results[0][0].transcript;
+//     sendAudioToServer(transcript);  // Enviar directamente al servidor
+// };
 
 // 🎤 **Capturar audio y enviarlo a Flask**
 navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
     const mediaRecorder = new MediaRecorder(stream);
-    
+
     micButton.addEventListener("click", function() {
         if (!userData.cedula) {
             alert("⚠️ Debes ingresar tu cédula antes de usar el micrófono.");
@@ -130,37 +131,53 @@ navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
         }
 
         if (!isRecording) {
-            // 🎤 **Iniciar grabación y reconocimiento**
+            // ✅ Iniciar grabación
+            manuallyStopped = false;
             recognition.start();
             mediaRecorder.start();
             isRecording = true;
             audioChunks = [];
-            micButton.textContent = "⏹️";  
+            micButton.textContent = "⏹️";
             console.log("🎤 Grabando...");
         } else {
-            // ⏹️ **Detener grabación y reconocimiento**
+            // ✅ Detener grabación
+            manuallyStopped = true;
             recognition.stop();
             mediaRecorder.stop();
             isRecording = false;
-            micButton.textContent = "🎤";  
+            micButton.textContent = "🎤";
             console.log("🎤 Grabación detenida.");
         }
     });
 
+    // 👂 Capturar fragmentos de audio
     mediaRecorder.ondataavailable = event => {
         audioChunks.push(event.data);
     };
 
+    // 📤 Enviar al servidor cuando se detiene manualmente
     mediaRecorder.onstop = () => {
-        const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-        const reader = new FileReader();
+        if (manuallyStopped) {
+            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+            const reader = new FileReader();
 
-        reader.onloadend = function() {
-            const base64Audio = reader.result.split(",")[1]; 
-            sendAudioToServer(base64Audio, userData.cedula, userData.nombre);
-        };
+            reader.onloadend = function() {
+                const base64Audio = reader.result.split(",")[1];
+                sendAudioToServer(base64Audio, userData.cedula, userData.nombre);
+            };
 
-        reader.readAsDataURL(audioBlob);
+            reader.readAsDataURL(audioBlob);
+        } else {
+            console.log("🛑 Grabación detenida automáticamente, pero ignorada.");
+        }
+    };
+
+    // 🧠 Si el reconocimiento termina por sí solo, ignorarlo a menos que sea manual
+    recognition.onend = () => {
+        if (!manuallyStopped) {
+            console.log("🔕 Reconocimiento terminado automáticamente, pero ignorado.");
+            return;
+        }
     };
 });
 
@@ -281,5 +298,24 @@ navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
         messageDiv.appendChild(timeStamp);
         chatBody.appendChild(messageDiv);
         chatBody.scrollTop = chatBody.scrollHeight;
+    }
+    // Función para disparar el entrenamiento del modelo
+    function trainModel() {
+        fetch("/train_model", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log("Resultado del entrenamiento:", data);
+            if(data.message) {
+                appendMessage("✅ Modelo entrenado exitosamente.", false);
+            } else if(data.error) {
+                appendMessage("❌ Error en el entrenamiento: " + data.error, false);
+            }
+        })
+        .catch(error => console.error("Error al entrenar el modelo:", error));
     }
 });

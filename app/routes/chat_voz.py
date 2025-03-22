@@ -1,84 +1,63 @@
 import base64
+import csv
 from datetime import datetime
 import io
 import os
 import re
-import time
 import unicodedata
 import wave
+import json
 from flask import Blueprint, request, jsonify
+from app.utils.preprocesamiento import normalize_text
+from app.utils.model_utils import predecir_categoria, entrenar_modelo
 
 chat_voz = Blueprint('chat_voz', __name__)
 
 turnos_registrados = {}
-
-# 📂 Directorio donde se guardarán los audios
 AUDIO_DIR = "citas_audios"
 
-# Si no existe la carpeta `citas_audios`, la creamos
 if not os.path.exists(AUDIO_DIR):
     os.makedirs(AUDIO_DIR)
 
-opciones = {
-    "1": "Ofertas Académicas",
-    "2": "Becas y Ayudas Económicas",
-    "3": "Requisitos de Inscripción",
-    "4": "Cambio de Carrera",
-    "5": "Atención en el Vicerrectorado"
-}
+CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(CURRENT_DIR, "..", "models")
+UTILS_DIR = os.path.join(CURRENT_DIR, "..", "utils")
 
-subopciones = {
-    "1": {
-        "Pregrado": ["Carreras de Ingeniería", "Carreras Sociales", "Carreras de Salud"],
-        "Posgrado": ["Maestrías en Tecnología", "Maestrías en Educación", "Maestrías en Administración"]
-    },
-    "2": {
-        "Requisitos para becas": ["Becas completas", "Becas parciales", "Becas deportivas"],
-        "Renovación de becas": ["Documentos necesarios", "Plazos de renovación", "Requisitos de renovación"]
-    },
-    "3": {
-        "Documentos requeridos": ["Acta de nacimiento", "Certificado de estudios", "Comprobante de domicilio"],
-        "Fechas de inscripción": ["Fechas de preinscripción", "Fechas de examen de admisión", "Fechas de inscripción final"]
-    },
-    "4": {
-        "Procedimiento": ["Solicitud en línea", "Evaluación de requisitos", "Confirmación de cambio"],
-        "Plazos y requisitos": ["Fechas límite", "Materias convalidables", "Criterios de aceptación"]
-    },
-    "5": {
-        "Horario de atención": ["Lunes a viernes", "Sábados", "Feriados"],
-        "Contacto del vicerrectorado": ["Correo electrónico", "Teléfono", "Oficinas físicas"]
-    }
-}
+# Rutas a los archivos JSON de opciones, subopciones y prioridades
+opciones_path = os.path.join(UTILS_DIR, "opciones.json")
+subopciones_path = os.path.join(UTILS_DIR, "subopciones.json")
+prioridades_path = os.path.join(UTILS_DIR, "prioridades.json")
 
-# 🔎 Palabras clave relacionadas con cada opción
-keywords = {
-    "Ofertas Académicas": ["pregrado", "posgrado", "carrera", "ingeniería", "sociales", "salud", "maestría"],
-    "Becas y Ayudas Económicas": ["beca", "ayuda", "económica", "renovación", "postular", "requisitos"],
-    "Requisitos de Inscripción": ["documento", "acta", "certificado", "inscripción", "admisión"],
-    "Cambio de Carrera": ["cambio", "traslado", "convalidación", "materia", "aceptación"],
-    "Atención en el Vicerrectorado": ["vicerrectorado", "contacto", "horario", "consulta", "correo", "teléfono"]
-}
+with open(opciones_path, encoding="utf-8") as f:
+    opciones = json.load(f)
 
-# 📌 Función para limpiar nombres de archivo
+with open(subopciones_path, encoding="utf-8") as f:
+    subopciones = json.load(f)
+
+with open(prioridades_path, encoding="utf-8") as f:
+    prioridades = json.load(f)
+
+# Función para limpiar nombres de archivos
 def sanitize_filename(filename):
     filename = unicodedata.normalize('NFKD', filename).encode('ascii', 'ignore').decode('ascii')
-    filename = re.sub(r'[^A-Za-z0-9_\-\.]', '', filename)  # Permite solo letras, números, guiones y puntos
+    filename = re.sub(r'[^A-Za-z0-9_\-\.]', '', filename)
     return filename
 
-# 📌 Función para normalizar texto
-def normalize_text(text):
-    text = unicodedata.normalize('NFKD', text).encode('ascii', 'ignore').decode('ascii')
-    text = re.sub(r'[^A-Za-z0-9\s]', '', text)
-    return text.lower()
+# Función para guardar datos en un CSV para futuros entrenamientos
+def guardar_datos_audio(transcribed_text, opcion_detectada):
+    datos_csv = os.path.join(UTILS_DIR, "datos_audio.csv")
+    # Si el archivo no existe, escribimos la cabecera
+    file_exists = os.path.isfile(datos_csv)
+    with open(datos_csv, "a", newline="", encoding="utf-8") as csvfile:
+        writer = csv.writer(csvfile)
+        if not file_exists:
+            writer.writerow(["texto", "opcion"])
+        writer.writerow([transcribed_text, opcion_detectada])
 
-# 📌 Procesar audio, guardar y generar JSON de la cita
 @chat_voz.route('/process_audio', methods=['POST'])
 def process_audio():
     try:
         data = request.json
-        if not data:
-            return jsonify({"error": "No se recibió ningún dato"}), 400
-
         audio_base64 = data.get("audio", "")
         cedula = data.get("cedula", "unknown")
         nombre_usuario = data.get("nombre", "No registrado")
@@ -86,101 +65,111 @@ def process_audio():
         if not audio_base64:
             return jsonify({"error": "No se recibió audio"}), 400
 
-        # Eliminar posible prefijo 'data:audio/wav;base64,'
+        # Remover prefijo si existe
         if audio_base64.startswith("data:"):
             audio_base64 = audio_base64.split(",")[1]
 
-        # Filtrar la cadena para dejar solo caracteres válidos en base64:
         audio_base64 = re.sub(r'[^A-Za-z0-9+/=]', '', audio_base64)
-        
-        # Asegurar que la cadena tenga el padding correcto
-        missing_padding = len(audio_base64) % 4
-        if missing_padding:
-            audio_base64 += '=' * (4 - missing_padding)
+        if len(audio_base64) % 4 == 1:
+            return jsonify({"error": "Audio inválido, base64 mal formado"}), 400
+        elif len(audio_base64) % 4:
+            audio_base64 += '=' * (4 - len(audio_base64) % 4)
 
-        # Decodificar el audio en binario
         try:
             audio_data = base64.b64decode(audio_base64, validate=True)
         except Exception as e:
             return jsonify({"error": f"Error al decodificar el audio: {str(e)}"}), 400
 
-        # Generar nombre de archivo usando la cédula y la fecha/hora actual
+        # Guardar audio en formato WAV
         fecha_hora = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         filename = sanitize_filename(f"{cedula}_{fecha_hora}.wav")
         filepath = os.path.join(AUDIO_DIR, filename)
 
-        # Guardar el archivo en citas_audios/
-        try:
-            with wave.open(filepath, "wb") as wf:
-                wf.setnchannels(1)  # Audio mono
-                wf.setsampwidth(2)  # 16 bits
-                wf.setframerate(44100)  # 44.1 kHz
-                wf.writeframes(audio_data)
-        except Exception as e:
-            return jsonify({"error": f"Error al escribir el archivo de audio: {str(e)}"}), 500
+        with wave.open(filepath, "wb") as wf:
+            wf.setnchannels(1)
+            wf.setsampwidth(2)
+            wf.setframerate(44100)
+            wf.writeframes(audio_data)
 
-        print(f"✅ Archivo guardado en: {filepath}")
+        print(f"✅ Audio guardado en {filepath}")
 
-        # 🔍 Simulación de texto transcrito
+        # 🔊 Transcripción simulada (aquí se integraría el servicio de reconocimiento de voz)
         transcribed_text = "quiero una cita para renovar mi beca en el vicerrectorado"
-        transcribed_text = normalize_text(transcribed_text)
+        texto_normalizado = normalize_text(transcribed_text)
 
-        # 🔎 Procesar el texto y generar la cita
-        cita_json = generar_cita_json(cedula, nombre_usuario, transcribed_text)
+        # Ruta del modelo y del CSV de datos
+        modelo_path = os.path.join(MODELS_DIR, "modelo_categorias.pkl")
+        datos_csv = os.path.join(UTILS_DIR, "datos_audio.csv")
         
-        return jsonify({"message": "Audio recibido correctamente", "filename": filename, "cita": cita_json})
+        # Si el modelo no existe, se entrena inicialmente (se crea un CSV con datos de ejemplo si es necesario)
+        if not os.path.exists(modelo_path):
+            print("El modelo no existe. Entrenando modelo inicial...")
+            if not os.path.exists(datos_csv):
+                with open(datos_csv, "w", newline="", encoding="utf-8") as csvfile:
+                    writer = csv.writer(csvfile)
+                    writer.writerow(["texto", "opcion"])
+                    writer.writerow(["quiero una cita para renovar mi beca en el vicerrectorado", "Becas y Ayudas Económicas"])
+            entrenar_modelo(datos_csv, modelo_path)
+        
+        # 🧠 Predecir categoría utilizando el modelo previamente entrenado
+        opcion_detectada = predecir_categoria(texto_normalizado, modelo_path)
 
-    except Exception as e:
-        print(f"❌ Error en process_audio: {str(e)}")
-        return jsonify({"error": f"Error interno del servidor: {str(e)}"}), 500
+        # Guardar los datos del audio para entrenamiento futuro
+        guardar_datos_audio(transcribed_text, opcion_detectada)
 
-# 📌 Función para extraer datos y generar el JSON de la cita
-def generar_cita_json(cedula, nombre_usuario, transcribed_text):
-    transcribed_text = transcribed_text.lower()
+        # ENTRENAMIENTO AUTOMÁTICO: Reentrena el modelo con los datos actualizados
+        entrenar_modelo(datos_csv, modelo_path)
 
-    opcion_detectada = None
-    subopcion_detectada = "No detectado"
-    detalle_detectado = "No detectado"
+        # 🔍 Detectar subopción y detalle
+        subopcion_detectada = "No detectado"
+        detalle_detectado = "No detectado"
 
-    # 1️⃣ Detectar la opción principal
-    for opcion, palabras in keywords.items():
-        if any(re.search(r'\b' + re.escape(palabra) + r'\b', transcribed_text) for palabra in palabras):
-            opcion_detectada = opcion
-            break
-
-    # 2️⃣ Detectar la subopción y detalle si se encuentra la opción principal
-    if opcion_detectada:
         for opcion_id, subops in subopciones.items():
-            if opciones[opcion_id] == opcion_detectada:
+            if opciones.get(opcion_id) == opcion_detectada:
                 for subop, detalles in subops.items():
-                    if subop.lower() in transcribed_text:
+                    if subop.lower() in texto_normalizado:
                         subopcion_detectada = subop
                         for detalle in detalles:
-                            if detalle.lower() in transcribed_text:
+                            if detalle.lower() in texto_normalizado:
                                 detalle_detectado = detalle
                                 break
                         break
                 break
 
-    # 3️⃣ Generar la palabra clave y turno
-    palabra_clave = opcion_detectada[:2].upper() if opcion_detectada else "XX"
+        palabra_clave = prioridades.get(opcion_detectada, {}).get("clave", "XX")
+        if palabra_clave not in turnos_registrados:
+            turnos_registrados[palabra_clave] = 1
+        else:
+            turnos_registrados[palabra_clave] += 1
+        turno = f"{palabra_clave}{turnos_registrados[palabra_clave]:03d}"
 
-    # 4️⃣ Generar el turno secuencial
-    if palabra_clave not in turnos_registrados:
-        turnos_registrados[palabra_clave] = 1
-    else:
-        turnos_registrados[palabra_clave] += 1
+        cita = {
+            "usuario": nombre_usuario,
+            "cedula": cedula,
+            "opcion": opcion_detectada,
+            "subopcion": subopcion_detectada,
+            "detalle": detalle_detectado,
+            "palabra_clave": palabra_clave,
+            "turno": turno,
+            "mensaje": f"{nombre_usuario} quiere agendar una cita para {opcion_detectada} sobre {subopcion_detectada} en {detalle_detectado}. Su turno es {turno}."
+        }
 
-    turno = f"{palabra_clave}{turnos_registrados[palabra_clave]:03d}"
+        return jsonify({
+            "message": "Audio recibido correctamente",
+            "filename": filename,
+            "cita": cita
+        })
 
-    # 5️⃣ Generar el JSON de la cita con el nombre del usuario
-    return {
-        "usuario": nombre_usuario,
-        "cedula": cedula,
-        "opcion": opcion_detectada or "No detectado",
-        "subopcion": subopcion_detectada,
-        "detalle": detalle_detectado,
-        "palabra_clave": palabra_clave,
-        "turno": turno,
-        "mensaje": f"{nombre_usuario} quiere agendar una cita para {opcion_detectada} sobre {subopcion_detectada} en {detalle_detectado}. Su turno es {turno}."
-    }
+    except Exception as e:
+        print(f"❌ Error en process_audio: {str(e)}")
+        return jsonify({"error": f"Error interno del servidor: {str(e)}"}), 500
+
+@chat_voz.route('/train_model', methods=['POST'])
+def train_model():
+    try:
+        ruta_csv = os.path.join(UTILS_DIR, "datos_audio.csv")
+        modelo_path = os.path.join(MODELS_DIR, "modelo_categorias.pkl")
+        entrenar_modelo(ruta_csv, modelo_path)
+        return jsonify({"message": "Modelo entrenado exitosamente"})
+    except Exception as e:
+        return jsonify({"error": f"Error al entrenar el modelo: {str(e)}"}), 500

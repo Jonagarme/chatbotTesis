@@ -1,0 +1,63 @@
+{
+    "1": {
+      "Pregrado": [
+        "Carreras de Ingeniería",
+        "Carreras Sociales",
+        "Carreras de Salud"
+      ],
+      "Posgrado": [
+        "Maestrías en Tecnología",
+        "Maestrías en Educación",
+        "Maestrías en Administración"
+      ]
+    },
+    "2": {
+      "Requisitos para becas": [
+        "Becas completas",
+        "Becas parciales",
+        "Becas deportivas"
+      ],
+      "Renovación de becas": [
+        "Documentos necesarios",
+        "Plazos de renovación",
+        "Requisitos de renovación"
+      ]
+    },
+    "3": {
+      "Documentos requeridos": [
+        "Acta de nacimiento",
+        "Certificado de estudios",
+        "Comprobante de domicilio"
+      ],
+      "Fechas de inscripción": [
+        "Fechas de preinscripción",
+        "Fechas de examen de admisión",
+        "Fechas de inscripción final"
+      ]
+    },
+    "4": {
+      "Procedimiento": [
+        "Solicitud en línea",
+        "Evaluación de requisitos",
+        "Confirmación de cambio"
+      ],
+      "Plazos y requisitos": [
+        "Fechas límite",
+        "Materias convalidables",
+        "Criterios de aceptación"
+      ]
+    },
+    "5": {
+      "Horario de atención": [
+        "Lunes a viernes",
+        "Sábados",
+        "Feriados"
+      ],
+      "Contacto del vicerrectorado": [
+        "Correo electrónico",
+        "Teléfono",
+        "Oficinas físicas"
+      ]
+    }
+  }
+  

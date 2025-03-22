@@ -1,4 +1,6 @@
 import time
+import json
+import os
 from flask import Blueprint, request, jsonify
 
 chat = Blueprint('chat', __name__)
@@ -7,7 +9,6 @@ chat = Blueprint('chat', __name__)
 user_sessions = {}
 user_last_activity = {}
 turnos_registrados = {}  # Para manejar turnos secuenciales
-
 
 SESSION_TIMEOUT = 300  # 5 minutos
 
@@ -19,6 +20,15 @@ prioridades = {
     "Cambio de Carrera": {"clave": "CC"},
     "Atención en el Vicerrectorado": {"clave": "AV"},
 }
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UTILS_DIR = os.path.join(BASE_DIR, "..", "utils")  # <-- ojo con ".."
+
+with open(os.path.join(UTILS_DIR, "opciones.json"), encoding="utf-8") as f:
+    opciones = json.load(f)
+
+with open(os.path.join(UTILS_DIR, "subopciones.json"), encoding="utf-8") as f:
+    subopciones = json.load(f)
 
 
 @chat.route('/chat', methods=['POST'])
@@ -33,52 +43,19 @@ def chats():
     user_id = "temp_user"
     current_time = time.time()
 
-    # Verificar si la sesión del usuario ha expirado
     if user_id in user_last_activity and (current_time - user_last_activity[user_id]) > SESSION_TIMEOUT:
-        user_sessions.pop(user_id, None)  # Eliminar sesión del usuario
-        user_last_activity.pop(user_id, None)  # Eliminar última actividad
+        user_sessions.pop(user_id, None)
+        user_last_activity.pop(user_id, None)
         return jsonify({
             "response": "¡Hola! Para continuar, ingresa tu nombre:",
             "step": 0,
             "userData": {}
         })
 
-    # Actualizar la última actividad del usuario
     user_last_activity[user_id] = current_time
 
     if user_id not in user_sessions:
         user_sessions[user_id] = {}
-
-    opciones = {
-        "1": "Ofertas Académicas",
-        "2": "Becas y Ayudas Económicas",
-        "3": "Requisitos de Inscripción",
-        "4": "Cambio de Carrera",
-        "5": "Atención en el Vicerrectorado"
-    }
-
-    subopciones = {
-        "1": {
-            "Pregrado": ["Carreras de Ingeniería", "Carreras Sociales", "Carreras de Salud"],
-            "Posgrado": ["Maestrías en Tecnología", "Maestrías en Educación", "Maestrías en Administración"]
-        },
-        "2": {
-            "Requisitos para becas": ["Becas completas", "Becas parciales", "Becas deportivas"],
-            "Renovación de becas": ["Documentos necesarios", "Plazos de renovación", "Requisitos de renovación"]
-        },
-        "3": {
-            "Documentos requeridos": ["Acta de nacimiento", "Certificado de estudios", "Comprobante de domicilio"],
-            "Fechas de inscripción": ["Fechas de preinscripción", "Fechas de examen de admisión", "Fechas de inscripción final"]
-        },
-        "4": {
-            "Procedimiento": ["Solicitud en línea", "Evaluación de requisitos", "Confirmación de cambio"],
-            "Plazos y requisitos": ["Fechas límite", "Materias convalidables", "Criterios de aceptación"]
-        },
-        "5": {
-            "Horario de atención": ["Lunes a viernes", "Sábados", "Feriados"],
-            "Contacto del vicerrectorado": ["Correo electrónico", "Teléfono", "Oficinas físicas"]
-        }
-    }
 
     response = ""
     next_step = step
@@ -122,13 +99,12 @@ def chats():
             response = "Por favor, selecciona una subopción válida."
             next_step = 3
 
-    elif step == 4:  # ✅ **Generamos el JSON final**
+    elif step == 4:
         opcion = user_sessions[user_id].get("opcion", "Desconocido")
         subopcion = user_sessions[user_id].get("subopcion", "Desconocido")
         detalle = user_data.get("detalle", "Desconocido")
-        prioridad = prioridades.get(opcion, {"clave": "XX"})  # Default en caso de error
+        prioridad = prioridades.get(opcion, {"clave": "XX"})
 
-        # 🏷️ **Generar el turno secuencial**
         palabra_clave = prioridad["clave"]
         if palabra_clave not in turnos_registrados:
             turnos_registrados[palabra_clave] = 1
