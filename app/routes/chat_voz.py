@@ -1,15 +1,19 @@
 import base64
 import csv
 from datetime import datetime
-import io
 import os
 import re
 import unicodedata
 import wave
-import json
+import requests
 from flask import Blueprint, request, jsonify
 from app.utils.preprocesamiento import normalize_text
-from app.utils.model_utils import predecir_categoria, entrenar_modelo
+from app.utils.model_utils import (
+    entrenar_modelo_modalidad,
+    predecir_modalidad,
+    entrenar_modelo_tipo_cita,
+    predecir_tipo_cita
+)
 
 chat_voz = Blueprint('chat_voz', __name__)
 
@@ -23,36 +27,22 @@ CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 MODELS_DIR = os.path.join(CURRENT_DIR, "..", "models")
 UTILS_DIR = os.path.join(CURRENT_DIR, "..", "utils")
 
-# Rutas a los archivos JSON de opciones, subopciones y prioridades
-opciones_path = os.path.join(UTILS_DIR, "opciones.json")
-subopciones_path = os.path.join(UTILS_DIR, "subopciones.json")
-prioridades_path = os.path.join(UTILS_DIR, "prioridades.json")
 
-with open(opciones_path, encoding="utf-8") as f:
-    opciones = json.load(f)
-
-with open(subopciones_path, encoding="utf-8") as f:
-    subopciones = json.load(f)
-
-with open(prioridades_path, encoding="utf-8") as f:
-    prioridades = json.load(f)
-
-# Función para limpiar nombres de archivos
 def sanitize_filename(filename):
     filename = unicodedata.normalize('NFKD', filename).encode('ascii', 'ignore').decode('ascii')
     filename = re.sub(r'[^A-Za-z0-9_\-\.]', '', filename)
     return filename
 
-# Función para guardar datos en un CSV para futuros entrenamientos
-def guardar_datos_audio(transcribed_text, opcion_detectada):
-    datos_csv = os.path.join(UTILS_DIR, "datos_audio.csv")
-    # Si el archivo no existe, escribimos la cabecera
+
+def guardar_datos(texto, modalidad, tipo_cita):
+    datos_csv = os.path.join(UTILS_DIR, "datos_modalidad.csv")
     file_exists = os.path.isfile(datos_csv)
     with open(datos_csv, "a", newline="", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         if not file_exists:
-            writer.writerow(["texto", "opcion"])
-        writer.writerow([transcribed_text, opcion_detectada])
+            writer.writerow(["texto", "modalidad", "tipo_cita"])
+        writer.writerow([texto, modalidad, tipo_cita])
+
 
 @chat_voz.route('/process_audio', methods=['POST'])
 def process_audio():
@@ -63,24 +53,18 @@ def process_audio():
         nombre_usuario = data.get("nombre", "No registrado")
 
         if not audio_base64:
-            return jsonify({"error": "No se recibió audio"}), 400
+            return jsonify({"error": "No se recibio audio"}), 400
 
-        # Remover prefijo si existe
         if audio_base64.startswith("data:"):
             audio_base64 = audio_base64.split(",")[1]
 
         audio_base64 = re.sub(r'[^A-Za-z0-9+/=]', '', audio_base64)
         if len(audio_base64) % 4 == 1:
-            return jsonify({"error": "Audio inválido, base64 mal formado"}), 400
+            return jsonify({"error": "Audio invalido"}), 400
         elif len(audio_base64) % 4:
             audio_base64 += '=' * (4 - len(audio_base64) % 4)
 
-        try:
-            audio_data = base64.b64decode(audio_base64, validate=True)
-        except Exception as e:
-            return jsonify({"error": f"Error al decodificar el audio: {str(e)}"}), 400
-
-        # Guardar audio en formato WAV
+        audio_data = base64.b64decode(audio_base64, validate=True)
         fecha_hora = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
         filename = sanitize_filename(f"{cedula}_{fecha_hora}.wav")
         filepath = os.path.join(AUDIO_DIR, filename)
@@ -91,67 +75,50 @@ def process_audio():
             wf.setframerate(44100)
             wf.writeframes(audio_data)
 
-        print(f"✅ Audio guardado en {filepath}")
+        print(f"✅ Audio guardado: {filepath}")
 
-        # 🔊 Transcripción simulada (aquí se integraría el servicio de reconocimiento de voz)
-        transcribed_text = "quiero una cita para renovar mi beca en el vicerrectorado"
+        transcribed_text = "quiero agendar una cita en el departamento academico sobre reuniones con TH en modalidad hibrida"
         texto_normalizado = normalize_text(transcribed_text)
 
-        # Ruta del modelo y del CSV de datos
-        modelo_path = os.path.join(MODELS_DIR, "modelo_categorias.pkl")
-        datos_csv = os.path.join(UTILS_DIR, "datos_audio.csv")
-        
-        # Si el modelo no existe, se entrena inicialmente (se crea un CSV con datos de ejemplo si es necesario)
-        if not os.path.exists(modelo_path):
-            print("El modelo no existe. Entrenando modelo inicial...")
-            if not os.path.exists(datos_csv):
-                with open(datos_csv, "w", newline="", encoding="utf-8") as csvfile:
-                    writer = csv.writer(csvfile)
-                    writer.writerow(["texto", "opcion"])
-                    writer.writerow(["quiero una cita para renovar mi beca en el vicerrectorado", "Becas y Ayudas Económicas"])
-            entrenar_modelo(datos_csv, modelo_path)
-        
-        # 🧠 Predecir categoría utilizando el modelo previamente entrenado
-        opcion_detectada = predecir_categoria(texto_normalizado, modelo_path)
+        modalidad_model_path = os.path.join(MODELS_DIR, "modelo_modalidad.pkl")
+        tipo_model_path = os.path.join(MODELS_DIR, "modelo_tipo_cita.pkl")
+        datos_csv = os.path.join(UTILS_DIR, "datos_modalidad.csv")
 
-        # Guardar los datos del audio para entrenamiento futuro
-        guardar_datos_audio(transcribed_text, opcion_detectada)
+        if not os.path.exists(modalidad_model_path) or not os.path.exists(tipo_model_path):
+            print("Modelo no encontrado, creando dataset inicial...")
+            with open(datos_csv, "w", newline="", encoding="utf-8") as f:
+                writer = csv.writer(f)
+                writer.writerow(["texto", "modalidad", "tipo_cita"])
+                writer.writerow([transcribed_text, "Hibrida", "Reuniones con TH"])
+            entrenar_modelo_modalidad(datos_csv, modalidad_model_path)
+            entrenar_modelo_tipo_cita(datos_csv, tipo_model_path)
 
-        # ENTRENAMIENTO AUTOMÁTICO: Reentrena el modelo con los datos actualizados
-        entrenar_modelo(datos_csv, modelo_path)
+        res_modalidades = requests.get("http://127.0.0.1:8000/api/modalidades_citas")
+        res_tipos = requests.get("http://127.0.0.1:8000/api/tipos_citas")
+        modalidades = res_modalidades.json()
+        tipos = res_tipos.json()
 
-        # 🔍 Detectar subopción y detalle
-        subopcion_detectada = "No detectado"
-        detalle_detectado = "No detectado"
+        modalidad_detectada = predecir_modalidad(texto_normalizado, modalidad_model_path)
+        tipo_detectado = predecir_tipo_cita(texto_normalizado, tipo_model_path)
 
-        for opcion_id, subops in subopciones.items():
-            if opciones.get(opcion_id) == opcion_detectada:
-                for subop, detalles in subops.items():
-                    if subop.lower() in texto_normalizado:
-                        subopcion_detectada = subop
-                        for detalle in detalles:
-                            if detalle.lower() in texto_normalizado:
-                                detalle_detectado = detalle
-                                break
-                        break
-                break
+        id_modalidad = next((m["id_modalidad"] for m in modalidades if m["nombre_modalidad"].lower() == modalidad_detectada.lower()), 1)
+        id_tipo_cita = next((t["id_tipo_cita"] for t in tipos if t["nombre_tipo_cita"].lower() == tipo_detectado.lower()), 1)
 
-        palabra_clave = prioridades.get(opcion_detectada, {}).get("clave", "XX")
-        if palabra_clave not in turnos_registrados:
-            turnos_registrados[palabra_clave] = 1
-        else:
-            turnos_registrados[palabra_clave] += 1
-        turno = f"{palabra_clave}{turnos_registrados[palabra_clave]:03d}"
+        guardar_datos(transcribed_text, modalidad_detectada, tipo_detectado)
+        entrenar_modelo_modalidad(datos_csv, modalidad_model_path)
+        entrenar_modelo_tipo_cita(datos_csv, tipo_model_path)
+
+        turno = f"{modalidad_detectada[:2].upper()}{datetime.now().strftime('%H%M')}"
 
         cita = {
             "usuario": nombre_usuario,
             "cedula": cedula,
-            "opcion": opcion_detectada,
-            "subopcion": subopcion_detectada,
-            "detalle": detalle_detectado,
-            "palabra_clave": palabra_clave,
+            "modalidad": modalidad_detectada,
+            "tipo_cita": tipo_detectado,
+            "id_modalidad": id_modalidad,
+            "id_tipo_cita": id_tipo_cita,
             "turno": turno,
-            "mensaje": f"{nombre_usuario} quiere agendar una cita para {opcion_detectada} sobre {subopcion_detectada} en {detalle_detectado}. Su turno es {turno}."
+            "mensaje": f"{nombre_usuario} quiere agendar una cita del tipo '{tipo_detectado}' en modalidad {modalidad_detectada}. Su turno es {turno}."
         }
 
         return jsonify({
@@ -164,12 +131,13 @@ def process_audio():
         print(f"❌ Error en process_audio: {str(e)}")
         return jsonify({"error": f"Error interno del servidor: {str(e)}"}), 500
 
+
 @chat_voz.route('/train_model', methods=['POST'])
 def train_model():
     try:
-        ruta_csv = os.path.join(UTILS_DIR, "datos_audio.csv")
-        modelo_path = os.path.join(MODELS_DIR, "modelo_categorias.pkl")
-        entrenar_modelo(ruta_csv, modelo_path)
-        return jsonify({"message": "Modelo entrenado exitosamente"})
+        ruta_csv = os.path.join(UTILS_DIR, "datos_modalidad.csv")
+        entrenar_modelo_modalidad(ruta_csv, os.path.join(MODELS_DIR, "modelo_modalidad.pkl"))
+        entrenar_modelo_tipo_cita(ruta_csv, os.path.join(MODELS_DIR, "modelo_tipo_cita.pkl"))
+        return jsonify({"message": "Modelos entrenados exitosamente"})
     except Exception as e:
-        return jsonify({"error": f"Error al entrenar el modelo: {str(e)}"}), 500
+        return jsonify({"error": f"Error al entrenar modelos: {str(e)}"}), 500
