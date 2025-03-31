@@ -1,0 +1,31 @@
+{
+	"table": "modalidades_citas",
+	"rows":
+	[
+		{
+			"id_modalidad": 1,
+			"nombre_modalidad": "Presencial",
+			"descripcion": "Cita realizada de forma presencial"
+		},
+		{
+			"id_modalidad": 2,
+			"nombre_modalidad": "Virtual",
+			"descripcion": "Cita realizada por videollamada"
+		},
+		{
+			"id_modalidad": 3,
+			"nombre_modalidad": "Telefónica",
+			"descripcion": "Cita realizada por llamada telefónica"
+		},
+		{
+			"id_modalidad": 4,
+			"nombre_modalidad": "Híbrida",
+			"descripcion": "Combinación presencial y virtual"
+		},
+		{
+			"id_modalidad": 5,
+			"nombre_modalidad": "Correo Electrónico",
+			"descripcion": "Interacción asincrónica por correo"
+		}
+	]
+}

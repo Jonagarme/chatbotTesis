@@ -1,13 +1,11 @@
-# Ignorar archivos compilados de Python
+# Ignorar directorios __pycache__
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+app/__pycache__/
+app/routes/__pycache__/
 
-# Ignorar entornos virtuales (si usas virtualenv o venv)
-venv/
-.env/
+output/
+logs/
 
-# Ignorar archivos de configuración de editores comunes
-.vscode/
-.idea/
+# Ignorar archivos de caché y bytecode de Python
+*.py[cod]
+*.pyc[cod]

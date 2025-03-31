@@ -1,8 +1,210 @@
 {
-    "1": "Ofertas Académicas",
-    "2": "Becas y Ayudas Económicas",
-    "3": "Requisitos de Inscripción",
-    "4": "Cambio de Carrera",
-    "5": "Atención en el Vicerrectorado"
-  }
-  
+	"table": "tipos_citas",
+	"rows":
+	[
+		{
+			"id_tipo_cita": 1,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Diseño curricular de carreras",
+			"descripcion": "Diseño curricular de carreras"
+		},
+		{
+			"id_tipo_cita": 2,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Diseño curricular de maestrías",
+			"descripcion": "Diseño curricular de maestrías"
+		},
+		{
+			"id_tipo_cita": 3,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Reunión con directores de carreras",
+			"descripcion": "Reunión con directores de carreras"
+		},
+		{
+			"id_tipo_cita": 4,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Reunión con coordinadores de maestría",
+			"descripcion": "Reunión con coordinadores de maestría"
+		},
+		{
+			"id_tipo_cita": 5,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Reunión metodológica",
+			"descripcion": "Reunión metodológica"
+		},
+		{
+			"id_tipo_cita": 6,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Reunión de planificación académica",
+			"descripcion": "Reunión de planificación académica"
+		},
+		{
+			"id_tipo_cita": 7,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Reuniones con instituciones extranjeras",
+			"descripcion": "Reuniones con instituciones extranjeras"
+		},
+		{
+			"id_tipo_cita": 8,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Despachos o reuniones con directivos del área académica",
+			"descripcion": "Despachos o reuniones con directivos del área académica"
+		},
+		{
+			"id_tipo_cita": 9,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Reuniones con el área de aseguramiento de la calidad",
+			"descripcion": "Reuniones con el área de aseguramiento de la calidad"
+		},
+		{
+			"id_tipo_cita": 10,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Reuniones con TH",
+			"descripcion": "Reuniones con TH"
+		},
+		{
+			"id_tipo_cita": 11,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Reunión con el rectorado",
+			"descripcion": "Reunión con el rectorado"
+		},
+		{
+			"id_tipo_cita": 12,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Reuniones con el vicerrectorado de investigación",
+			"descripcion": "Reuniones con el vicerrectorado de investigación"
+		},
+		{
+			"id_tipo_cita": 13,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Reuniones externas",
+			"descripcion": "Reuniones externas"
+		},
+		{
+			"id_tipo_cita": 14,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Participación en congresos y eventos",
+			"descripcion": "Participación en congresos y eventos"
+		},
+		{
+			"id_tipo_cita": 15,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Participación en actividades o eventos de la universidad",
+			"descripcion": "Participación en actividades o eventos de la universidad"
+		},
+		{
+			"id_tipo_cita": 16,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Visitas a instituciones",
+			"descripcion": "Visitas a instituciones"
+		},
+		{
+			"id_tipo_cita": 17,
+			"tipo_departamento": "ACADEMICO",
+			"nombre_tipo_cita": "Otras",
+			"descripcion": "Otras"
+		},
+		{
+			"id_tipo_cita": 18,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reunión con la dirección de investigación",
+			"descripcion": "Reunión con la dirección de investigación"
+		},
+		{
+			"id_tipo_cita": 19,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reunión de la dirección de vinculación social",
+			"descripcion": "Reunión de la dirección de vinculación social"
+		},
+		{
+			"id_tipo_cita": 20,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reunión con la dirección de internacionalización",
+			"descripcion": "Reunión con la dirección de internacionalización"
+		},
+		{
+			"id_tipo_cita": 21,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reunión con el área de innovación y transferencia",
+			"descripcion": "Reunión con el área de innovación y transferencia"
+		},
+		{
+			"id_tipo_cita": 22,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reuniones con instituciones extranjeras",
+			"descripcion": "Reuniones con instituciones extranjeras"
+		},
+		{
+			"id_tipo_cita": 23,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Despachos con directivos del área de investigación y VS",
+			"descripcion": "Despachos con directivos del área de investigación y VS"
+		},
+		{
+			"id_tipo_cita": 24,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reuniones con el área de aseguramiento de la calidad",
+			"descripcion": "Reuniones con el área de aseguramiento de la calidad"
+		},
+		{
+			"id_tipo_cita": 25,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reuniones con TH",
+			"descripcion": "Reuniones con TH"
+		},
+		{
+			"id_tipo_cita": 26,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reunión con el rectorado",
+			"descripcion": "Reunión con el rectorado"
+		},
+		{
+			"id_tipo_cita": 27,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reuniones con el vicerrectorado académico",
+			"descripcion": "Reuniones con el vicerrectorado académico"
+		},
+		{
+			"id_tipo_cita": 28,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reuniones externas",
+			"descripcion": "Reuniones externas"
+		},
+		{
+			"id_tipo_cita": 29,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Participación en actividades o eventos de la universidad",
+			"descripcion": "Participación en actividades o eventos de la universidad"
+		},
+		{
+			"id_tipo_cita": 30,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Participación en congresos y eventos",
+			"descripcion": "Participación en congresos y eventos"
+		},
+		{
+			"id_tipo_cita": 31,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Visitas a instituciones",
+			"descripcion": "Visitas a instituciones"
+		},
+		{
+			"id_tipo_cita": 32,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reunión con directores de carreras",
+			"descripcion": "Reunión con directores de carreras"
+		},
+		{
+			"id_tipo_cita": 33,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Reunión con coordinadores de maestría",
+			"descripcion": "Reunión con coordinadores de maestría"
+		},
+		{
+			"id_tipo_cita": 34,
+			"tipo_departamento": "INVESTIGACION",
+			"nombre_tipo_cita": "Otras 2",
+			"descripcion": "Otras"
+		}
+	]
+}
