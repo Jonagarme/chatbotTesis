@@ -81,20 +81,126 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // **Mostrar Opciones Principales**
-    window.showMainOptions = function() {
-        chatBody.innerHTML = `<p>¡Bienvenido, ${userData.nombre}! Selecciona una opción para agendar una cita:</p>`;
-        let options = {
-            "1": "Ofertas Académicas",
-            "2": "Becas y Ayudas Económicas",
-            "3": "Requisitos de Inscripción",
-            "4": "Cambio de Carrera",
-            "5": "Atención en el Vicerrectorado"
-        };
-
-        for (let key in options) {
-            chatBody.innerHTML += `<button class="chat-option" onclick="sendOption('${key}', '${options[key]}')">${options[key]}</button>`;
-        }
+    window.showMainOptions = function () {
+        chatBody.innerHTML = `<p>¡Bienvenido, ${userData.nombre}! Selecciona un departamento:</p>`;
+    
+        fetch("http://127.0.0.1:8000/api/tipos_citas")
+            .then(response => response.json())
+            .then(data => {
+                let departamentos = {};
+    
+                // Agrupamos por tipo_departamento
+                data.forEach(cita => {
+                    if (!departamentos[cita.tipo_departamento]) {
+                        departamentos[cita.tipo_departamento] = [];
+                    }
+                    departamentos[cita.tipo_departamento].push(cita);
+                });
+    
+                // Creamos los botones de tipo_departamento
+                Object.keys(departamentos).forEach(dep => {
+                    chatBody.innerHTML += `<button class="chat-option" onclick='showCitasPorDepartamento(${JSON.stringify(departamentos[dep])})'>${dep}</button>`;
+                });
+            })
+            .catch(error => {
+                console.error("Error cargando tipos de cita:", error);
+                chatBody.innerHTML += `<p>⚠️ Error al cargar las opciones. Inténtalo más tarde.</p>`;
+            });
     };
+
+    window.showCitasPorDepartamento = function(citas) {
+        chatBody.innerHTML = "<p>Selecciona un tipo de cita:</p>";
+    
+        citas.forEach(cita => {
+            chatBody.innerHTML += `<button class="chat-option" onclick="seleccionarTipoCita('${cita.nombre_tipo_cita}', ${cita.id_tipo_cita})">${cita.nombre_tipo_cita}</button>`;
+        });
+    
+        // Botón para volver a departamentos
+        chatBody.innerHTML += `<button class="chat-option" onclick="showMainOptions()">↩ Volver</button>`;
+    };
+    
+    window.seleccionarTipoCita = function(nombreTipo, idTipo) {
+        appendMessage(`Has seleccionado: ${nombreTipo}`);
+        userData.opcion = nombreTipo;
+        userData.id_tipo_cita = idTipo;
+    
+        chatBody.innerHTML = `<p>Selecciona una modalidad para tu cita:</p>`;
+    
+        fetch("http://127.0.0.1:8000/api/modalidades_citas")
+            .then(response => response.json())
+            .then(modalidades => {
+                modalidades.forEach(mod => {
+                    chatBody.innerHTML += `<button class="chat-option" onclick="seleccionarModalidad('${mod.nombre_modalidad}', ${mod.id_modalidad})">${mod.nombre_modalidad}</button>`;
+                });
+    
+                chatBody.innerHTML += `<button class="chat-option" onclick="showMainOptions()">↩ Volver</button>`;
+            })
+            .catch(error => {
+                console.error("Error cargando modalidades:", error);
+                chatBody.innerHTML += `<p>⚠️ Error al cargar modalidades. Inténtalo más tarde.</p>`;
+            });
+    };
+
+    window.seleccionarModalidad = function(nombreModalidad, idModalidad) {
+        appendMessage(`Has seleccionado la modalidad: ${nombreModalidad}`);
+        userData.modalidad = nombreModalidad;
+        userData.id_modalidad = idModalidad;
+    
+        // 🔹 Fechas: de la hora actual a una hora después
+        const now = new Date();
+        const fechaInicio = new Date(now);
+        const fechaFin = new Date(now);
+        fechaFin.setHours(now.getHours() + 1);
+    
+        // 🔹 Formato "YYYY-MM-DD HH:MM:SS"
+        const formatDate = (date) => {
+            const yyyy = date.getFullYear();
+            const mm = String(date.getMonth() + 1).padStart(2, '0');
+            const dd = String(date.getDate()).padStart(2, '0');
+            const hh = String(date.getHours()).padStart(2, '0');
+            const mi = String(date.getMinutes()).padStart(2, '0');
+            const ss = String(date.getSeconds()).padStart(2, '0');
+            return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+        };
+    
+        // 🟢 Simulamos ID solicitante y responsable por ahora
+        const payload = {
+            cedula_solicitante: userData.cedula,
+            estado: "Pendiente",
+            fecha_hora_inicio: formatDate(fechaInicio),
+            fecha_hora_fin: formatDate(fechaFin),
+            id_modalidad: idModalidad,
+            id_tipo_cita: userData.id_tipo_cita,
+            id_solicitante: 1,     // 🔧 Aquí puedes usar lógica real si tienes
+            id_responsable: 2,     // 🔧 Lo mismo para esto
+            nombre_solicitante: userData.nombre,
+            notas: userData.opcion  // Aquí guardamos el nombre del tipo de cita
+        };
+    
+        // 🔄 Enviar a la API
+        fetch("http://127.0.0.1:8000/api/citas", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+        })
+        .then(response => {
+            if (!response.ok) throw new Error("Error al registrar cita");
+            return response.json();
+        })
+        .then(data => {
+            chatBody.innerHTML = `<p>✅ Tu cita fue registrada exitosamente.</p>
+                <p><strong>${userData.nombre}</strong> - Modalidad: <strong>${nombreModalidad}</strong></p>
+                <p>🗓️ Fecha: ${formatDate(fechaInicio)} a ${formatDate(fechaFin)}</p>
+                <button class="chat-option restart-button" onclick="resetChat()">🔄 Reiniciar Conversación</button>`;
+        })
+        .catch(error => {
+            console.error("Error al enviar cita:", error);
+            chatBody.innerHTML = `<p>❌ Ocurrió un error al registrar la cita. Intenta nuevamente.</p>`;
+        });
+    };
+    
+    
+    
 
 // 🎤 **Habilitar reconocimiento de voz**
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -124,14 +230,13 @@ recognition.onend = function() {
 navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
     const mediaRecorder = new MediaRecorder(stream);
 
-    micButton.addEventListener("click", function() {
+    micButton.addEventListener("click", function () {
         if (!userData.cedula) {
             alert("⚠️ Debes ingresar tu cédula antes de usar el micrófono.");
             return;
         }
 
         if (!isRecording) {
-            // ✅ Iniciar grabación
             manuallyStopped = false;
             recognition.start();
             mediaRecorder.start();
@@ -140,7 +245,6 @@ navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
             micButton.textContent = "⏹️";
             console.log("🎤 Grabando...");
         } else {
-            // ✅ Detener grabación
             manuallyStopped = true;
             recognition.stop();
             mediaRecorder.stop();
@@ -150,18 +254,16 @@ navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
         }
     });
 
-    // 👂 Capturar fragmentos de audio
     mediaRecorder.ondataavailable = event => {
         audioChunks.push(event.data);
     };
 
-    // 📤 Enviar al servidor cuando se detiene manualmente
     mediaRecorder.onstop = () => {
         if (manuallyStopped) {
             const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
             const reader = new FileReader();
 
-            reader.onloadend = function() {
+            reader.onloadend = function () {
                 const base64Audio = reader.result.split(",")[1];
                 sendAudioToServer(base64Audio, userData.cedula, userData.nombre);
             };
@@ -172,105 +274,48 @@ navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
         }
     };
 
-    // 🧠 Si el reconocimiento termina por sí solo, ignorarlo a menos que sea manual
     recognition.onend = () => {
         if (!manuallyStopped) {
             console.log("🔕 Reconocimiento terminado automáticamente, pero ignorado.");
-            return;
         }
     };
 });
 
-    // **Enviar el audio en Base64 al servidor**
-    function sendAudioToServer(base64Audio, cedula) {
-        fetch("/process_audio", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({ audio: base64Audio, cedula: cedula, nombre: userData.nombre })  // Se envía el nombre del usuario
+// ✅ Función para enviar el audio
+function sendAudioToServer(base64Audio, cedula, nombre) {
+    fetch("/process_audio", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+            audio: base64Audio,
+            cedula: cedula,
+            nombre: nombre
         })
-        .then(response => response.json())
-        .then(data => {
-            console.log("🎤 Respuesta del servidor:", data);
+    })
+    .then(response => response.json())
+    .then(data => {
+        console.log("🎤 Respuesta del servidor:", data);
 
-            if (data.cita) {
-                const mensajeFinal = data.cita.mensaje;  // Mensaje generado con la cita
-                appendMessage(mensajeFinal, false);  // Mostrar en el chat
-                
-                // Mostrar también el turno en un mensaje separado
-                const turnoMensaje = `🗓️ Tu turno es: ${data.cita.turno}`;
-                appendMessage(turnoMensaje, false);
-            }
-        })
-        .catch(error => console.error("Error enviando audio:", error));
-    }
+        if (data.cita) {
+            const c = data.cita;
+            appendMessage(`📝 ${c.mensaje}`, false);
+            appendMessage(`🗓️ Turno: ${c.turno}`, false);
+            appendMessage(`📌 Modalidad: ${c.modalidad || "No detectada"}`, false);
+            appendMessage(`📄 Tipo de cita: ${c.tipo_cita || "No detectado"}`, false);
 
-
-    // **Enviar opción principal**
-    window.sendOption = function(option, optionName) {
-        appendMessage(`Has seleccionado: ${optionName}`);
-        userData.opcion = optionName;
-        chatBody.innerHTML = '<p>Selecciona una subopción:</p>';
-        
-        let subOptions = {
-            "Ofertas Académicas": ["Pregrado", "Posgrado"],
-            "Becas y Ayudas Económicas": ["Requisitos para becas", "Renovación de becas"],
-            "Requisitos de Inscripción": ["Documentos requeridos", "Fechas de inscripción"],
-            "Cambio de Carrera": ["Procedimiento", "Plazos y requisitos"],
-            "Atención en el Vicerrectorado": ["Horario de atención", "Contacto del vicerrectorado"]
-        };
-
-        if (subOptions[optionName]) {
-            subOptions[optionName].forEach(sub => {
-                chatBody.innerHTML += `<button class="chat-option" onclick="sendSubOption('${optionName}', '${sub}')">${sub}</button>`;
-            });
+            enviarCitaDetectada(c);
+            trainModel();
+        } else {
+            appendMessage("❌ No se pudo registrar la cita.", false);
         }
-
-        // **Botón Volver**
-        chatBody.innerHTML += `<button class="chat-option" onclick="showMainOptions()">↩ Volver</button>`;
-    };
-
-    // **Enviar subopción**
-    window.sendSubOption = function(option, subOptionName) {
-        appendMessage(`Has seleccionado: ${subOptionName}`);
-        userData.subopcion = subOptionName;
-        chatBody.innerHTML = '<p>Selecciona un detalle:</p>';
-
-        let detailOptions = {
-            "Pregrado": ["Carreras de Ingeniería", "Carreras Sociales", "Carreras de Salud"],
-            "Posgrado": ["Maestrías en Tecnología", "Maestrías en Educación", "Maestrías en Administración"],
-            "Requisitos para becas": ["Becas completas", "Becas parciales", "Becas deportivas"],
-            "Renovación de becas": ["Documentos necesarios", "Plazos de renovación", "Requisitos de renovación"]
-        };
-
-        if (detailOptions[subOptionName]) {
-            detailOptions[subOptionName].forEach(detail => {
-                chatBody.innerHTML += `<button class="chat-option" onclick="sendDetailOption('${subOptionName}', '${detail}')">${detail}</button>`;
-            });
-        }
-
-        // **Botón Volver**
-        chatBody.innerHTML += `<button class="chat-option" onclick="sendOption('${userData.opcion}', '${option}')">↩ Volver</button>`;
-    };
-
-    // **Enviar opción final (detalle)**
-    window.sendDetailOption = function(subOption, detailName) {
-        appendMessage(`Has seleccionado: ${detailName}`);
-        userData.detalle = detailName;
-    
-        fetch("/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ step: 4, userData: userData })
-        })
-        .then(response => response.json())
-        .then(data => {
-            appendMessage(data.response);  // Mostramos el mensaje con el turno asignado
-            // Agregar botón de reinicio de conversación
-            chatBody.innerHTML += `<button class="chat-option restart-button" onclick="resetChat()">🔄 Reiniciar Conversación</button>`;
-            });
-    };
+    })
+    .catch(error => {
+        console.error("Error enviando audio:", error);
+        appendMessage("⚠️ Error al enviar el audio. Intenta nuevamente.", false);
+    });
+}
 
     // Función para reiniciar el chat
     window.resetChat = function() {
@@ -318,4 +363,57 @@ navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
         })
         .catch(error => console.error("Error al entrenar el modelo:", error));
     }
+
+    // ✅ Enviar la cita a la API cuando es detectada desde audio
+function enviarCitaDetectada(cita) {
+    const now = new Date();
+    const fechaInicio = new Date(now);
+    const fechaFin = new Date(now);
+    fechaFin.setHours(now.getHours() + 1);
+
+    const formatDate = (date) => {
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        const dd = String(date.getDate()).padStart(2, '0');
+        const hh = String(date.getHours()).padStart(2, '0');
+        const mi = String(date.getMinutes()).padStart(2, '0');
+        const ss = String(date.getSeconds()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
+    };
+
+    const payload = {
+        cedula_solicitante: cita.cedula,
+        estado: "Pendiente",
+        fecha_hora_inicio: formatDate(fechaInicio),
+        fecha_hora_fin: formatDate(fechaFin),
+        id_modalidad: cita.id_modalidad,
+        id_tipo_cita: cita.id_tipo_cita,
+        id_solicitante: 1, // puedes ajustarlo
+        id_responsable: 2,
+        nombre_solicitante: cita.usuario,
+        notas: cita.tipo_cita
+    };
+
+    fetch("http://127.0.0.1:8000/api/citas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    })
+    .then(response => {
+        if (!response.ok) throw new Error("Error al registrar cita");
+        return response.json();
+    })
+    .then(data => {
+        chatBody.innerHTML = `<p>✅ Tu cita fue registrada exitosamente.</p>
+            <p><strong>${cita.usuario}</strong> - Modalidad: <strong>${cita.modalidad}</strong></p>
+            <p>🗓️ Fecha: ${formatDate(fechaInicio)} a ${formatDate(fechaFin)}</p>
+            <p> Su cita esta en proceso de revision y aprobacion por el departamento correspondiente</p>
+            <button class="chat-option restart-button" onclick="resetChat()">🔄 Reiniciar Conversación</button>`;
+    })
+    .catch(error => {
+        console.error("❌ Error al enviar cita:", error);
+        chatBody.innerHTML = `<p>❌ Ocurrió un error al registrar la cita. Intenta nuevamente.</p>`;
+    });
+}
+
 });
