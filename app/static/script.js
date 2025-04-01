@@ -1,6 +1,6 @@
 document.addEventListener("DOMContentLoaded", function() {
     let step = 0;
-    let userData = { nombre: "", cedula: "", opcion: "", subopcion: "", detalle: "" };
+    let userData = { nombre: "", cedula: "", email: "", opcion: "", subopcion: "", detalle: "" };
     let inactivityTimer;
     const chatInput = document.getElementById("chat-input");
     const sendButton = document.getElementById("send-button");
@@ -51,10 +51,13 @@ document.addEventListener("DOMContentLoaded", function() {
         chatInput.value = "";
     
         if (step === 0) {
-            userData.nombre = message; 
+            userData.nombre = message;
         } else if (step === 1) {
             userData.cedula = message;
+        } else if (step === 2) {
+            userData.email = message;
         }
+        
     
         fetch("/chat", {
             method: "POST",
@@ -66,13 +69,15 @@ document.addEventListener("DOMContentLoaded", function() {
             if (step === 0) {
                 step = 1;
                 chatBody.innerHTML = `<p>Gracias, ${userData.nombre}. Ahora ingresa tu cédula:</p>`;
-            } else if (step === 1 && data.step === 1) {
-                chatBody.innerHTML = `<p id="chat-message">${data.response}</p>`;
-            } else if (step === 1 && data.step === 2) {
+            } else if (step === 1) {
+                step = 2;
+                chatBody.innerHTML = `<p>Perfecto. Ahora escribe tu correo electrónico:</p>`;
+            } else if (step === 2) {
                 chatTitle.textContent = "Bienvenido, " + userData.nombre;
                 micButton.disabled = false;
                 showMainOptions();
-            } else {
+            }
+             else {
                 appendMessage(data.response);
             }
             step = data.step;
@@ -81,65 +86,109 @@ document.addEventListener("DOMContentLoaded", function() {
     }
 
     // **Mostrar Opciones Principales**
-    window.showMainOptions = function () {
-        chatBody.innerHTML = `<p>¡Bienvenido, ${userData.nombre}! Selecciona un departamento:</p>`;
-    
-        fetch("http://127.0.0.1:8000/api/tipos_citas")
-            .then(response => response.json())
-            .then(data => {
-                let departamentos = {};
-    
-                // Agrupamos por tipo_departamento
-                data.forEach(cita => {
-                    if (!departamentos[cita.tipo_departamento]) {
-                        departamentos[cita.tipo_departamento] = [];
-                    }
-                    departamentos[cita.tipo_departamento].push(cita);
-                });
-    
-                // Creamos los botones de tipo_departamento
-                Object.keys(departamentos).forEach(dep => {
-                    chatBody.innerHTML += `<button class="chat-option" onclick='showCitasPorDepartamento(${JSON.stringify(departamentos[dep])})'>${dep}</button>`;
-                });
-            })
-            .catch(error => {
-                console.error("Error cargando tipos de cita:", error);
-                chatBody.innerHTML += `<p>⚠️ Error al cargar las opciones. Inténtalo más tarde.</p>`;
-            });
-    };
+// 🔷 Mostrar los departamentos como tarjetas
+window.showMainOptions = function () {
+    chatBody.innerHTML = `<p>¡Bienvenido, ${userData.nombre}! Selecciona un departamento:</p>
+    <div class="departamentos-grid"></div>`;
 
-    window.showCitasPorDepartamento = function(citas) {
-        chatBody.innerHTML = "<p>Selecciona un tipo de cita:</p>";
-    
-        citas.forEach(cita => {
-            chatBody.innerHTML += `<button class="chat-option" onclick="seleccionarTipoCita('${cita.nombre_tipo_cita}', ${cita.id_tipo_cita})">${cita.nombre_tipo_cita}</button>`;
-        });
-    
-        // Botón para volver a departamentos
-        chatBody.innerHTML += `<button class="chat-option" onclick="showMainOptions()">↩ Volver</button>`;
-    };
-    
-    window.seleccionarTipoCita = function(nombreTipo, idTipo) {
-        appendMessage(`Has seleccionado: ${nombreTipo}`);
-        userData.opcion = nombreTipo;
-        userData.id_tipo_cita = idTipo;
-    
-        chatBody.innerHTML = `<p>Selecciona una modalidad para tu cita:</p>`;
-    
-        fetch("http://127.0.0.1:8000/api/modalidades_citas")
-            .then(response => response.json())
-            .then(modalidades => {
-                modalidades.forEach(mod => {
-                    chatBody.innerHTML += `<button class="chat-option" onclick="seleccionarModalidad('${mod.nombre_modalidad}', ${mod.id_modalidad})">${mod.nombre_modalidad}</button>`;
-                });
-    
-                chatBody.innerHTML += `<button class="chat-option" onclick="showMainOptions()">↩ Volver</button>`;
-            })
-            .catch(error => {
-                console.error("Error cargando modalidades:", error);
-                chatBody.innerHTML += `<p>⚠️ Error al cargar modalidades. Inténtalo más tarde.</p>`;
+    const grid = document.querySelector(".departamentos-grid");
+
+    fetch("http://127.0.0.1:8000/api/tipos_citas")
+        .then(response => response.json())
+        .then(data => {
+            let departamentos = {};
+
+            data.forEach(cita => {
+                if (!departamentos[cita.tipo_departamento]) {
+                    departamentos[cita.tipo_departamento] = [];
+                }
+                departamentos[cita.tipo_departamento].push(cita);
             });
-    };
+
+            Object.keys(departamentos).forEach(dep => {
+                const card = document.createElement("div");
+                card.className = "departamento-card";
+                card.innerHTML = `
+                    <div class="icon">🏢</div>
+                    <div class="departamento-titulo">${dep}</div>
+                    <div class="departamento-desc">Ver citas disponibles</div>
+                `;
+                card.onclick = () => showCitasPorDepartamento(departamentos[dep]);
+                grid.appendChild(card);
+            });
+        })
+        .catch(error => {
+            console.error("Error cargando tipos de cita:", error);
+            chatBody.innerHTML += `<p>⚠️ Error al cargar las opciones. Inténtalo más tarde.</p>`;
+        });
+};
+
+// 🔷 Mostrar tipos de cita como tarjetas
+window.showCitasPorDepartamento = function(citas) {
+    chatBody.innerHTML = `<p>Selecciona un tipo de cita:</p>
+    <div class="citas-grid"></div>`;
+
+    const grid = document.querySelector(".citas-grid");
+
+    citas.forEach(cita => {
+        const card = document.createElement("div");
+        card.className = "cita-card";
+        card.innerHTML = `
+            <div class="icon">📄</div>
+            <div class="cita-titulo">${cita.nombre_tipo_cita}</div>
+            <div class="cita-desc">${cita.descripcion || "Tipo de cita"}</div>
+        `;
+        card.onclick = () => seleccionarTipoCita(cita.nombre_tipo_cita, cita.id_tipo_cita);
+        grid.appendChild(card);
+    });
+
+    const volver = document.createElement("button");
+    volver.className = "chat-option volver-boton";
+    volver.innerText = "↩ Volver";
+    volver.onclick = showMainOptions;
+    chatBody.appendChild(volver);
+};
+
+    
+   window.seleccionarTipoCita = function(nombreTipo, idTipo) {
+    appendMessage(`Has seleccionado: ${nombreTipo}`);
+    userData.opcion = nombreTipo;
+    userData.id_tipo_cita = idTipo;
+
+    chatBody.innerHTML = `
+        <p>Selecciona una modalidad para tu cita:</p>
+        <div class="modalidades-grid"></div>
+    `;
+
+    const grid = document.querySelector(".modalidades-grid");
+
+    fetch("http://127.0.0.1:8000/api/modalidades_citas")
+        .then(response => response.json())
+        .then(modalidades => {
+            modalidades.forEach(mod => {
+                const card = document.createElement("div");
+                card.className = "modalidad-card";
+                card.innerHTML = `
+                    <div class="icon">🎯</div>
+                    <div class="modalidad-titulo">${mod.nombre_modalidad}</div>
+                    <div class="modalidad-desc">${mod.descripcion}</div>
+                `;
+                card.onclick = () => seleccionarModalidad(mod.nombre_modalidad, mod.id_modalidad);
+                grid.appendChild(card);
+            });
+
+            const volver = document.createElement("button");
+            volver.className = "chat-option volver-boton";
+            volver.innerText = "↩ Volver";
+            volver.onclick = showMainOptions;
+            chatBody.appendChild(volver);
+        })
+        .catch(error => {
+            console.error("Error cargando modalidades:", error);
+            chatBody.innerHTML += `<p>⚠️ Error al cargar modalidades. Inténtalo más tarde.</p>`;
+        });
+};
+
 
     window.seleccionarModalidad = function(nombreModalidad, idModalidad) {
         appendMessage(`Has seleccionado la modalidad: ${nombreModalidad}`);
@@ -166,6 +215,7 @@ document.addEventListener("DOMContentLoaded", function() {
         // 🟢 Simulamos ID solicitante y responsable por ahora
         const payload = {
             cedula_solicitante: userData.cedula,
+            email_solicitante: userData.email,
             estado: "Pendiente",
             fecha_hora_inicio: formatDate(fechaInicio),
             fecha_hora_fin: formatDate(fechaFin),
@@ -177,6 +227,7 @@ document.addEventListener("DOMContentLoaded", function() {
             notas: userData.opcion  // Aquí guardamos el nombre del tipo de cita
         };
     
+        log("Enviando datos a la API:", payload);
         // 🔄 Enviar a la API
         fetch("http://127.0.0.1:8000/api/citas", {
             method: "POST",
@@ -383,6 +434,7 @@ function enviarCitaDetectada(cita) {
 
     const payload = {
         cedula_solicitante: cita.cedula,
+        email_solicitante: cita.email || "sin@email.com",
         estado: "Pendiente",
         fecha_hora_inicio: formatDate(fechaInicio),
         fecha_hora_fin: formatDate(fechaFin),
