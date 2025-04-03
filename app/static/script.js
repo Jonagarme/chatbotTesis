@@ -52,13 +52,39 @@ document.addEventListener("DOMContentLoaded", function() {
     
         if (step === 0) {
             userData.nombre = message;
-        } else if (step === 1) {
-            userData.cedula = message;
-        } else if (step === 2) {
-            userData.email = message;
+            step = 1;
+            chatBody.innerHTML = `<p>Gracias, ${userData.nombre}. Ahora ingresa tu cédula:</p>`;
+            return;
         }
-        
     
+        if (step === 1) {
+            // Validar cédula: 13 dígitos numéricos
+            if (!/^\d{10,13}$/.test(message)) {
+                appendMessage("⚠️ La cédula debe tener exactamente 13 números.", false);
+                return;
+            }
+            userData.cedula = message;
+            step = 2;
+            chatBody.innerHTML = `<p>Perfecto. Ahora escribe tu correo electrónico:</p>`;
+            return;
+        }
+    
+        if (step === 2) {
+            // Validar correo
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(message)) {
+                appendMessage("⚠️ Por favor ingresa un correo válido (ej. nombre@ejemplo.com).", false);
+                return;
+            }
+            userData.email = message;
+            chatTitle.textContent = "Bienvenido, " + userData.nombre;
+            micButton.disabled = false;
+            showMainOptions();
+            step = 3; // ya no volverá a pedir datos
+            return;
+        }
+    
+        // Si hay una respuesta posterior
         fetch("/chat", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -66,24 +92,12 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .then(response => response.json())
         .then(data => {
-            if (step === 0) {
-                step = 1;
-                chatBody.innerHTML = `<p>Gracias, ${userData.nombre}. Ahora ingresa tu cédula:</p>`;
-            } else if (step === 1) {
-                step = 2;
-                chatBody.innerHTML = `<p>Perfecto. Ahora escribe tu correo electrónico:</p>`;
-            } else if (step === 2) {
-                chatTitle.textContent = "Bienvenido, " + userData.nombre;
-                micButton.disabled = false;
-                showMainOptions();
-            }
-             else {
-                appendMessage(data.response);
-            }
+            appendMessage(data.response);
             step = data.step;
         })
         .catch(error => console.error("Error en la solicitud:", error));
     }
+    
 
     // **Mostrar Opciones Principales**
 // 🔷 Mostrar los departamentos como tarjetas
@@ -93,7 +107,7 @@ window.showMainOptions = function () {
 
     const grid = document.querySelector(".departamentos-grid");
 
-    fetch("http://127.0.0.1:8000/api/tipos_citas")
+    fetch("http://186.101.89.170:8083/api/tipos_citas")
         .then(response => response.json())
         .then(data => {
             let departamentos = {};
@@ -162,7 +176,7 @@ window.showCitasPorDepartamento = function(citas) {
 
     const grid = document.querySelector(".modalidades-grid");
 
-    fetch("http://127.0.0.1:8000/api/modalidades_citas")
+    fetch("http://186.101.89.170:8083/api/modalidades_citas")
         .then(response => response.json())
         .then(modalidades => {
             modalidades.forEach(mod => {
@@ -227,9 +241,8 @@ window.showCitasPorDepartamento = function(citas) {
             notas: userData.opcion  // Aquí guardamos el nombre del tipo de cita
         };
     
-        log("Enviando datos a la API:", payload);
         // 🔄 Enviar a la API
-        fetch("http://127.0.0.1:8000/api/citas", {
+        fetch("http://186.101.89.170:8083/api/citas", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
@@ -446,7 +459,7 @@ function enviarCitaDetectada(cita) {
         notas: cita.tipo_cita
     };
 
-    fetch("http://127.0.0.1:8000/api/citas", {
+    fetch("http://186.101.89.170:8083/api/citas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
