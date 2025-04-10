@@ -8,11 +8,14 @@ document.addEventListener("DOMContentLoaded", function() {
     const micButton = document.getElementById("mic-button");
     const chatTitle = document.getElementById("chat-title");
 
-    micButton.disabled = true; 
-    let mediaRecorder;
-    let audioChunks = [];
+    micButton.disabled = true;
     let isRecording = false;
     let manuallyStopped = false;
+
+    let recorder;
+    let audioContext;
+    let stream;
+    let input; // Se declara aquí para uso posterior
 
     function resetInactivityTimer() {
         clearTimeout(inactivityTimer);
@@ -24,9 +27,9 @@ document.addEventListener("DOMContentLoaded", function() {
         userData = { nombre: "", cedula: "", opcion: "", subopcion: "", detalle: "" };
         chatTitle.textContent = "Asistente Virtual";
         chatBody.innerHTML = '<p id="chat-message">¡Hola! Para continuar, ingresa tu nombre:</p>';
-        micButton.disabled = true; 
+        micButton.disabled = true;
     }
-    
+
     document.getElementById("chat-button").addEventListener("click", function() {
         document.getElementById("chat-container").style.display = "flex";
         resetInactivityTimer();
@@ -35,7 +38,7 @@ document.addEventListener("DOMContentLoaded", function() {
     document.getElementById("close-chat").addEventListener("click", function() {
         document.getElementById("chat-container").style.display = "none";
     });
-    
+
     sendButton.addEventListener("click", sendMessage);
     chatInput.addEventListener("keypress", function(event) {
         if (event.key === "Enter") {
@@ -46,17 +49,17 @@ document.addEventListener("DOMContentLoaded", function() {
     function sendMessage() {
         const message = chatInput.value.trim();
         if (!message) return;
-    
+
         appendMessage(message, true);
         chatInput.value = "";
-    
+
         if (step === 0) {
             userData.nombre = message;
             step = 1;
             chatBody.innerHTML = `<p>Gracias, ${userData.nombre}. Ahora ingresa tu cédula:</p>`;
             return;
         }
-    
+
         if (step === 1) {
             // Validar cédula: 13 dígitos numéricos
             if (!/^\d{10,13}$/.test(message)) {
@@ -68,7 +71,7 @@ document.addEventListener("DOMContentLoaded", function() {
             chatBody.innerHTML = `<p>Perfecto. Ahora escribe tu correo electrónico:</p>`;
             return;
         }
-    
+
         if (step === 2) {
             // Validar correo
             const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -83,7 +86,7 @@ document.addEventListener("DOMContentLoaded", function() {
             step = 3; // ya no volverá a pedir datos
             return;
         }
-    
+
         // Si hay una respuesta posterior
         fetch("/chat", {
             method: "POST",
@@ -97,7 +100,7 @@ document.addEventListener("DOMContentLoaded", function() {
         })
         .catch(error => console.error("Error en la solicitud:", error));
     }
-    
+
 
     // **Mostrar Opciones Principales**
 // 🔷 Mostrar los departamentos como tarjetas
@@ -107,7 +110,7 @@ window.showMainOptions = function () {
 
     const grid = document.querySelector(".departamentos-grid");
 
-    fetch("http://186.101.89.170:8083/api/tipos_citas")
+    fetch("http://127.0.0.1:8000/api/tipos_citas")
         .then(response => response.json())
         .then(data => {
             let departamentos = {};
@@ -163,7 +166,7 @@ window.showCitasPorDepartamento = function(citas) {
     chatBody.appendChild(volver);
 };
 
-    
+
    window.seleccionarTipoCita = function(nombreTipo, idTipo) {
     appendMessage(`Has seleccionado: ${nombreTipo}`);
     userData.opcion = nombreTipo;
@@ -176,7 +179,7 @@ window.showCitasPorDepartamento = function(citas) {
 
     const grid = document.querySelector(".modalidades-grid");
 
-    fetch("http://186.101.89.170:8083/api/modalidades_citas")
+    fetch("http://127.0.0.1:8000/api/modalidades_citas")
         .then(response => response.json())
         .then(modalidades => {
             modalidades.forEach(mod => {
@@ -208,13 +211,13 @@ window.showCitasPorDepartamento = function(citas) {
         appendMessage(`Has seleccionado la modalidad: ${nombreModalidad}`);
         userData.modalidad = nombreModalidad;
         userData.id_modalidad = idModalidad;
-    
+
         // 🔹 Fechas: de la hora actual a una hora después
         const now = new Date();
         const fechaInicio = new Date(now);
         const fechaFin = new Date(now);
         fechaFin.setHours(now.getHours() + 1);
-    
+
         // 🔹 Formato "YYYY-MM-DD HH:MM:SS"
         const formatDate = (date) => {
             const yyyy = date.getFullYear();
@@ -225,7 +228,7 @@ window.showCitasPorDepartamento = function(citas) {
             const ss = String(date.getSeconds()).padStart(2, '0');
             return `${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}`;
         };
-    
+
         // 🟢 Simulamos ID solicitante y responsable por ahora
         const payload = {
             cedula_solicitante: userData.cedula,
@@ -240,9 +243,9 @@ window.showCitasPorDepartamento = function(citas) {
             nombre_solicitante: userData.nombre,
             notas: userData.opcion  // Aquí guardamos el nombre del tipo de cita
         };
-    
+
         // 🔄 Enviar a la API
-        fetch("http://186.101.89.170:8083/api/citas", {
+        fetch("http://127.0.0.1:8000/api/citas", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
@@ -253,7 +256,7 @@ window.showCitasPorDepartamento = function(citas) {
         })
         .then(data => {
             chatBody.innerHTML = `<p>✅ Tu cita fue registrada exitosamente.</p>
-                <p><strong>${userData.nombre}</strong> - Modalidad: <strong>${nombreModalidad}</strong></p>
+                <p><strong>${userData.tipo_cita}</strong> - Modalidad: <strong>${nombreModalidad}</strong></p>
                 <p>🗓️ Fecha: ${formatDate(fechaInicio)} a ${formatDate(fechaFin)}</p>
                 <button class="chat-option restart-button" onclick="resetChat()">🔄 Reiniciar Conversación</button>`;
         })
@@ -262,27 +265,26 @@ window.showCitasPorDepartamento = function(citas) {
             chatBody.innerHTML = `<p>❌ Ocurrió un error al registrar la cita. Intenta nuevamente.</p>`;
         });
     };
-    
-    
-    
+
+
+
 
 // 🎤 **Habilitar reconocimiento de voz**
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 const recognition = new SpeechRecognition();
 recognition.lang = "es-ES";
-recognition.continuous = false; 
-recognition.interimResults = false; 
+recognition.continuous = false;
+recognition.interimResults = false;
 
-let isRecognizing = false;
-
-recognition.onstart = function() {
-    isRecognizing = true;
-    console.log("🎤 Escuchando...");
+recognition.onstart = function () {
+    console.log("🎤 Reconocimiento iniciado.");
 };
 
-recognition.onend = function() {
-    isRecognizing = false;
-    console.log("🎤 Reconocimiento detenido.");
+recognition.onend = function () {
+    console.log("🎤 Reconocimiento finalizado.");
+    if (!manuallyStopped) {
+        console.log("🔕 Fin automático ignorado.");
+    }
 };
 
 // recognition.onresult = function(event) {
@@ -291,95 +293,95 @@ recognition.onend = function() {
 // };
 
 // 🎤 **Capturar audio y enviarlo a Flask**
-navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
-    const mediaRecorder = new MediaRecorder(stream);
+// 🎤 Capturar audio y enviarlo a Flask como .wav real
+micButton.addEventListener("click", async () => {
+    if (!userData.cedula) {
+        alert("⚠️ Debes ingresar tu cédula antes de usar el micrófono.");
+        return;
+    }
 
-    micButton.addEventListener("click", function () {
-        if (!userData.cedula) {
-            alert("⚠️ Debes ingresar tu cédula antes de usar el micrófono.");
+    if (!isRecording) {
+        manuallyStopped = false;
+        stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        input = audioContext.createMediaStreamSource(stream);
+
+        try {
+            recorder = new Recorder(input, { numChannels: 1 });
+        } catch (e) {
+            console.error("Recorder no está definido. Asegúrate de haber cargado recorder.min.js correctamente.");
+            alert("Error: no se pudo inicializar la grabadora.");
             return;
         }
 
-        if (!isRecording) {
-            manuallyStopped = false;
-            recognition.start();
-            mediaRecorder.start();
-            isRecording = true;
-            audioChunks = [];
-            micButton.textContent = "⏹️";
-            console.log("🎤 Grabando...");
-        } else {
-            manuallyStopped = true;
-            recognition.stop();
-            mediaRecorder.stop();
-            isRecording = false;
-            micButton.textContent = "🎤";
-            console.log("🎤 Grabación detenida.");
-        }
-    });
+        recorder.record();
+        recognition.start();
+        isRecording = true;
+        micButton.textContent = "⏹️";
+        console.log("🎤 Grabando...");
+    } else {
+        manuallyStopped = true;
+        recognition.stop();
+        recorder.stop();
 
-    mediaRecorder.ondataavailable = event => {
-        audioChunks.push(event.data);
-    };
-
-    mediaRecorder.onstop = () => {
-        if (manuallyStopped) {
-            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+        recorder.exportWAV(blob => {
             const reader = new FileReader();
-
             reader.onloadend = function () {
                 const base64Audio = reader.result.split(",")[1];
                 sendAudioToServer(base64Audio, userData.cedula, userData.nombre);
             };
+            reader.readAsDataURL(blob);
+        });
 
-            reader.readAsDataURL(audioBlob);
-        } else {
-            console.log("🛑 Grabación detenida automáticamente, pero ignorada.");
-        }
-    };
+        recorder.clear();
+        stream.getTracks().forEach(track => track.stop());
+        audioContext.close();
+        isRecording = false;
+        micButton.textContent = "🎤";
+        console.log("🎤 Grabación detenida.");
+    }
+});
 
     recognition.onend = () => {
         if (!manuallyStopped) {
             console.log("🔕 Reconocimiento terminado automáticamente, pero ignorado.");
         }
     };
-});
 
-// ✅ Función para enviar el audio
-function sendAudioToServer(base64Audio, cedula, nombre) {
-    fetch("/process_audio", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-            audio: base64Audio,
-            cedula: cedula,
-            nombre: nombre
+
+    function sendAudioToServer(base64Audio, cedula, nombre) {
+        fetch("/process_audio", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                audio: base64Audio,
+                cedula: cedula,
+                nombre: nombre,
+                email: userData.email
+            })
         })
-    })
-    .then(response => response.json())
-    .then(data => {
-        console.log("🎤 Respuesta del servidor:", data);
-
-        if (data.cita) {
-            const c = data.cita;
-            appendMessage(`📝 ${c.mensaje}`, false);
-            appendMessage(`🗓️ Turno: ${c.turno}`, false);
-            appendMessage(`📌 Modalidad: ${c.modalidad || "No detectada"}`, false);
-            appendMessage(`📄 Tipo de cita: ${c.tipo_cita || "No detectado"}`, false);
-
-            enviarCitaDetectada(c);
-            trainModel();
-        } else {
-            appendMessage("❌ No se pudo registrar la cita.", false);
-        }
-    })
-    .catch(error => {
-        console.error("Error enviando audio:", error);
-        appendMessage("⚠️ Error al enviar el audio. Intenta nuevamente.", false);
-    });
-}
+        .then(response => response.json())
+        .then(data => {
+            console.log("🎤 Respuesta del servidor:", data);
+            if (data.cita) {
+                const c = data.cita;
+                appendMessage(`📝 ${c.mensaje}`, false);
+                appendMessage(`🗓️ Turno: ${c.turno}`, false);
+                appendMessage(`📌 Modalidad: ${c.modalidad || "No detectada"}`, false);
+                appendMessage(`📄 Tipo de cita: ${c.tipo_cita || "No detectado"}`, false);
+                enviarCitaDetectada(c);
+                trainModel();
+            } else {
+                appendMessage("❌ No se pudo registrar la cita.", false);
+            }
+        })
+        .catch(error => {
+            console.error("Error enviando audio:", error);
+            appendMessage("⚠️ Error al enviar el audio. Intenta nuevamente.", false);
+        });
+    }
 
     // Función para reiniciar el chat
     window.resetChat = function() {
@@ -395,14 +397,14 @@ function sendAudioToServer(base64Audio, cedula, nombre) {
         const messageDiv = document.createElement("div");
         messageDiv.classList.add("message");
         if (isUser) messageDiv.classList.add("user-message");
-        
+
         const messageText = document.createElement("p");
         messageText.textContent = text;
-        
+
         const timeStamp = document.createElement("span");
         timeStamp.classList.add("message-time");
         timeStamp.textContent = new Date().toLocaleTimeString();
-        
+
         messageDiv.appendChild(messageText);
         messageDiv.appendChild(timeStamp);
         chatBody.appendChild(messageDiv);
@@ -459,7 +461,7 @@ function enviarCitaDetectada(cita) {
         notas: cita.tipo_cita
     };
 
-    fetch("http://186.101.89.170:8083/api/citas", {
+    fetch("http://127.0.0.1:8000/api/citas", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload)
@@ -470,7 +472,7 @@ function enviarCitaDetectada(cita) {
     })
     .then(data => {
         chatBody.innerHTML = `<p>✅ Tu cita fue registrada exitosamente.</p>
-            <p><strong>${cita.usuario}</strong> - Modalidad: <strong>${cita.modalidad}</strong></p>
+            <p><strong>${cita.tipo_cita}</strong> - Modalidad: <strong>${cita.modalidad}</strong></p>
             <p>🗓️ Fecha: ${formatDate(fechaInicio)} a ${formatDate(fechaFin)}</p>
             <p> Su cita esta en proceso de revision y aprobacion por el departamento correspondiente</p>
             <button class="chat-option restart-button" onclick="resetChat()">🔄 Reiniciar Conversación</button>`;
