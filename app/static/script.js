@@ -30,11 +30,12 @@ document.addEventListener("DOMContentLoaded", function() {
         micButton.disabled = true;
     }
 
-    document.getElementById("chat-button").addEventListener("click", function() {
-        document.getElementById("chat-container").style.display = "flex";
+    document.getElementById("chat-gif").addEventListener("click", function () {
+        const container = document.getElementById("chat-container");
+        container.style.display = container.style.display === "flex" ? "none" : "flex";
         resetInactivityTimer();
     });
-
+    
     document.getElementById("close-chat").addEventListener("click", function() {
         document.getElementById("chat-container").style.display = "none";
     });
