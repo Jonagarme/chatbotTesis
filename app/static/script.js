@@ -63,7 +63,7 @@ document.addEventListener("DOMContentLoaded", function() {
         if (step === 1) {
             // Validar cédula: 13 dígitos numéricos
             if (!/^\d{10,13}$/.test(message)) {
-                appendMessage("⚠️ La cédula debe tener exactamente 13 números.", false);
+                appendMessage("⚠️ La cédula  o ruc no debe tener mas de 13 digitos.", false);
                 return;
             }
             userData.cedula = message;
@@ -240,7 +240,7 @@ window.showCitasPorDepartamento = function(citas) {
             id_tipo_cita: userData.id_tipo_cita,
             id_solicitante: 1,     // 🔧 Aquí puedes usar lógica real si tienes
             id_responsable: 2,     // 🔧 Lo mismo para esto
-            nombre_solicitante: userData.nombre,
+            nombre_solicitante: `Reunion con: ${userData.nombre}`,
             notas: userData.opcion  // Aquí guardamos el nombre del tipo de cita
         };
 
@@ -256,7 +256,7 @@ window.showCitasPorDepartamento = function(citas) {
         })
         .then(data => {
             chatBody.innerHTML = `<p>✅ Tu cita fue registrada exitosamente.</p>
-                <p><strong>${userData.tipo_cita}</strong> - Modalidad: <strong>${nombreModalidad}</strong></p>
+                <p><strong>${userData.opcion}</strong> - Modalidad: <strong>${nombreModalidad}</strong></p>
                 <p>🗓️ Fecha: ${formatDate(fechaInicio)} a ${formatDate(fechaFin)}</p>
                 <button class="chat-option restart-button" onclick="resetChat()">🔄 Reiniciar Conversación</button>`;
         })

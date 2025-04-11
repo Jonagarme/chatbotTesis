@@ -124,6 +124,7 @@ def process_audio():
         audio_base64 = data.get("audio", "")
         cedula = data.get("cedula", "unknown")
         nombre_usuario = data.get("nombre", "No registrado")
+        email = data.get("email", "")
 
         if not audio_base64:
             return jsonify({"error": "No se recibió audio"}), 400
@@ -217,6 +218,7 @@ def process_audio():
             "id_modalidad": id_modalidad,
             "id_tipo_cita": id_tipo_cita,
             "turno": turno,
+            "email":email,
             "mensaje": f"{nombre_usuario} quiere agendar una cita del tipo '{tipo_detectado}' en modalidad {modalidad_detectada}. Su turno es {turno}."
         }
 
