@@ -5,6 +5,7 @@ app/routes/__pycache__/
 
 output/
 logs/
+routes/credentials.json
 
 # Ignorar archivos de caché y bytecode de Python
 *.py[cod]
